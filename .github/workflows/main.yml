@@ -1,149 +1,93 @@
-name: Main
-on: workflow_dispatch
+name: Build DenpaEX
+
+on:
+  push:
+    branches: [ main, experimental ]
+  pull_request:
+    branches: [ main, experimental ]
+  workflow_dispatch:
+
 jobs:
-  Windows:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
-      - name: Setup Haxe
-        uses: krdlab/setup-haxe@master
-        with:
-          haxe-version: 4.3.6
-
-      - name: Install Libraries
-        run: |
-          haxelib install hmm --quiet
-          haxelib run hmm install --quiet
-
-      - name: Compile (Crash Handler)
-        run: cd crshhndlr && haxelib run lime build windows
-
-      - name: Compile (DenpaEx)
-        run: haxelib run lime build windows
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@main
-        with:
-          name: windowsBuild
-          path: export\release\windows\bin\*
-          if-no-files-found: error
-  Linux:
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
-      - name: Setup Haxe
-        uses: krdlab/setup-haxe@master
-        with:
-          haxe-version: 4.3.6
-
-      - name: Install Libraries
-        run: |
-          DEBIAN_FRONTEND=noninteractive sudo apt-get -qq install -o Dpkg::Progress-Fancy="0" -o APT::Color="0" -o Dpkg::Use-Pty="0" libvlc-dev libvlccore-dev < /dev/null > /dev/null
-          haxelib install hmm --quiet
-          haxelib run hmm install --quiet
-
-      - name: Compile
-        run: haxelib run lime build linux
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@main
-        with:
-          name: linuxBuild
-          path: export/release/linux/bin/*
-          if-no-files-found: error
-  macOS:
-    runs-on: macos-${{matrix.version}}
-    strategy:
-      matrix:
-        version: [12, 13]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
-      - name: Setup Haxe
-        uses: krdlab/setup-haxe@master
-        with:
-          haxe-version: 4.3.6
-
-      - name: Install Libraries
-        run: |
-          haxelib install hmm --quiet
-          haxelib run hmm install --quiet
-
-      - name: Compile
-        run: haxelib run lime build mac
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@main
-        with:
-          name: macOSBuild-${{matrix.version}}
-          path: export/release/macos/bin/*
-          if-no-files-found: error
-  Android:
+  buildLinux:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@main
+      - uses: actions/checkout@v4.1.7
 
-      - name: Setup Haxe
-        uses: krdlab/setup-haxe@master
+      - uses: krdlab/setup-haxe@master
         with:
           haxe-version: 4.3.6
 
-      - name: Install Libraries
+      - name: Install Haxelibs
         run: |
+          sudo apt-get -qq install libvlc-dev libvlccore-dev
+          haxelib setup ~/haxelib
           haxelib install hmm --quiet
           haxelib run hmm install --quiet
 
-      - name: Configure Android
-        run: |
-          haxelib run lime config ANDROID_SDK $ANDROID_HOME
-          haxelib run lime config ANDROID_NDK_ROOT $ANDROID_NDK_LATEST_HOME
-          haxelib run lime config JAVA_HOME $JAVA_HOME_17_X64
-          haxelib run lime config ANDROID_SETUP true 
+      - name: Create Version Tag
+        run: echo "${{ github.run_id }}" > VERSION
 
-      - name: Compile
-        run: haxelib run lime build android
+      - name: Compile (DenpaEX)
+        run: haxelib run lime build linux --app-version="4.0.0-${{ github.run_id }}" -D officialBuild
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@main
+      - name: Publish Artifact
+        uses: actions/upload-artifact@v4.3.4
         with:
-          name: androidBuild
-          path: export/release/android/bin/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-  iOS:
-    runs-on: macos-14
+          name: linuxBuild
+          path: export/release/linux/bin
+
+  buildWindows:
+    runs-on: windows-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@main
+      - uses: actions/checkout@v4.1.7
 
-      - name: Setup Haxe
-        uses: krdlab/setup-haxe@master
+      - uses: krdlab/setup-haxe@master
         with:
           haxe-version: 4.3.6
 
-      - name: Install Libraries
+      - name: Install Haxelibs
         run: |
+          haxelib setup C:/haxelib
+          haxelib install hmm --quiet
+          haxelib run hmm install --quiet
+        shell: cmd
+
+      - name: Create Version Tag
+        run: echo "${{ github.run_id }}" > VERSION
+
+      - name: Compile (DenpaEX)
+        run: haxelib run lime build windows --app-version="4.0.0-${{ github.run_id }}" -D officialBuild
+        shell: cmd
+
+      - name: Publish Artifact
+        uses: actions/upload-artifact@v4.3.4
+        with:
+          name: windowsBuild
+          path: export/release/windows/bin
+
+  buildMac:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4.1.7
+
+      - uses: krdlab/setup-haxe@master
+        with:
+          haxe-version: 4.3.6
+
+      - name: Install Haxelibs
+        run: |
+          haxelib setup ~/haxelib
           haxelib install hmm --quiet
           haxelib run hmm install --quiet
 
-      - name: Compile
-        run: haxelib run lime build ios -nosign -arm64
+      - name: Create Version Tag
+        run: echo "${{ github.run_id }}" > VERSION
 
-      - name: Make Ipa
-        run: |
-          cd export/release/ios/build/*-iphoneos
-          mkdir Payload
-          mv *.app Payload
-          zip -r DenpaEx.ipa Payload
+      - name: Compile (DenpaEX)
+        run: haxelib run lime build mac --app-version="4.0.0-${{ github.run_id }}" -D officialBuild
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@main
+      - name: Publish Artifact
+        uses: actions/upload-artifact@v4.3.4
         with:
-          name: iOSBuild
-          path: export/release/ios/build/Release-iphoneos/*.ipa
-          if-no-files-found: error
+          name: macBuild
+          path: export/release/macos/bin
