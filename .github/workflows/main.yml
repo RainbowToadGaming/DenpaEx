@@ -1,3 +1,13 @@
+name: Build DenpaEX
+
+on:
+  push:
+    branches: [ main, experimental ]
+  pull_request:
+    branches: [ main, experimental ]
+  workflow_dispatch:
+
+jobs:
   buildWindows:
     runs-on: windows-latest
     steps:
@@ -7,20 +17,20 @@
         with:
           haxe-version: 4.3.6
 
-      # Fix 1: Ensure Git is installed and globally usable
+      # Ensure Git is installed for haxelib git
       - name: Ensure Git Installed
         run: |
           choco install git -y
         shell: powershell
 
-      # Fix 2: Initialize Haxelib and local repository for CI
+      # Setup Haxelib for Windows CI
       - name: Setup Haxelib
         run: |
           haxelib setup C:/haxelib
           haxelib newrepo
         shell: cmd
 
-      # Fix 3: Install dependencies (Lime/OpenFL from MobilePorting + hmm)
+      # Install dependencies (hmm, Lime, OpenFL)
       - name: Install Dependencies
         run: |
           git config --global core.longpaths true
@@ -30,17 +40,17 @@
           haxelib git openfl https://github.com/MobilePorting/openfl
         shell: cmd
 
-      # Create a simple build tag
+      # Create a version tag for this build
       - name: Create Version Tag
         run: echo "${{ github.run_id }}" > VERSION
         shell: cmd
 
-      # Build DenpaEX for Windows
+      # Compile DenpaEX for Windows
       - name: Compile (DenpaEX)
         run: haxelib run lime build windows --app-version="4.0.0-${{ github.run_id }}" -D officialBuild
         shell: cmd
 
-      # Upload output build artifact
+      # Upload compiled files
       - name: Publish Artifact
         uses: actions/upload-artifact@v4.3.4
         with:
