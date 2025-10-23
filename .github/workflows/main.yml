@@ -1,58 +1,40 @@
-name: Build DenpaEX
+name: Build FNF Game
 
 on:
   push:
-    branches: [ main, experimental ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, experimental ]
-  workflow_dispatch:
+    branches: [ main ]
 
 jobs:
   buildWindows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4.1.7
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: krdlab/setup-haxe@master
+      - name: Setup Haxe
+        uses: krdlab/setup-haxe@v1
         with:
-          haxe-version: 4.3.6
+          haxe-version: 4.3.4
 
-      # Ensure Git is installed for haxelib git
-      - name: Ensure Git Installed
+      - name: Install haxelib
         run: |
-          choco install git -y
-        shell: powershell
+          haxelib setup C:\haxelib
+          haxelib install hmm
+          haxelib run hmm install
 
-      # Setup Haxelib for Windows CI
-      - name: Setup Haxelib
+      - name: Install dependencies
         run: |
-          haxelib setup C:/haxelib
-          haxelib newrepo
-        shell: cmd
+          haxelib install lime
+          haxelib install openfl
+          haxelib install flixel
+          haxelib install hxcpp
+          haxelib install hscript
+          haxelib install hxjson
 
-      # Install dependencies (hmm, Lime, OpenFL)
-      - name: Install Dependencies
-        run: |
-          git config --global core.longpaths true
-          haxelib install hmm --quiet
-          haxelib run hmm install --quiet
-          haxelib git lime https://github.com/MobilePorting/lime
-          haxelib git openfl https://github.com/MobilePorting/openfl
-        shell: cmd
+      - name: Setup Lime
+        run: haxelib run lime setup
 
-      # Create a version tag for this build
-      - name: Create Version Tag
-        run: echo "${{ github.run_id }}" > VERSION
-        shell: cmd
-
-      # Compile DenpaEX for Windows
-      - name: Compile (DenpaEX)
-        run: haxelib run lime build windows --app-version="4.0.0-${{ github.run_id }}" -D officialBuild
-        shell: cmd
-
-      # Upload compiled files
-      - name: Publish Artifact
-        uses: actions/upload-artifact@v4.3.4
-        with:
-          name: windowsBuild
-          path: export/release/windows/bin
+      - name: Build for Windows
+        run: haxelib run lime build windows
